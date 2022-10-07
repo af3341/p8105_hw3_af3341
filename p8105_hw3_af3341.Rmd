@@ -1,0 +1,11 @@
+---
+title: "p8105_hw3_af3341"
+author: "Alana Ferris"
+date: "2022-10-07"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
