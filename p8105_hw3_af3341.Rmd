@@ -10,9 +10,7 @@ editor_options:
 ```{r setup, message = FALSE, warning = FALSE}
 library(tidyverse)
 library(ggridges)
-library(patchwork)
 library(dplyr)
-library(ggplot2)
 ```
 
 # Problem 1
@@ -75,6 +73,7 @@ grouped = instacart %>%
     discrete = TRUE) + 
     coord_flip()
 ```
+
 ### Table for three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”
 
 ```{r, warning = FALSE}
@@ -97,7 +96,8 @@ mean_hour = instacart %>%
   filter(product_name == "Pink Lady Apples" | product_name == "Coffee Ice Cream") %>% 
   select(product_name, order_dow, order_hour_of_day) %>% 
   group_by(product_name, order_dow) %>% 
-  summarize(mean_hour_of_day = mean(order_hour_of_day, na.rm = TRUE)) %>% 
+  summarize(
+    mean_hour_of_day = mean(order_hour_of_day, na.rm = TRUE)) %>% 
   pivot_wider(
     names_from = "order_dow",
     values_from = "mean_hour_of_day"
@@ -105,6 +105,66 @@ mean_hour = instacart %>%
   select(Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday)
 
 mean_hour
+```
+
+# Problem 2
+
+## Tidying the accel_data
+
+```{r, message = FALSE, warning = FALSE}
+accel_data = read_csv('data/accel_data.csv') %>% 
+  janitor::clean_names() %>% 
+  pivot_longer(
+    activity_1:activity_1440, 
+    names_to = "minutes", 
+    values_to = "count", names_prefix = "activity_") %>% 
+  mutate(day_type = recode(day, "Monday" = "weekday", "Tuesday" = "weekday", "Wednesday" = "weekday", "Thursday" = "weekday", "Friday" = "weekday", "Saturday" = "weekend", "Sunday" = "weekend")) %>% 
+  mutate(day = factor(day, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")), day_type = factor(day_type)) %>% 
+  mutate_at(c("minutes"), as.numeric)
+```
+
+## Dataset Description
+
+The `accel_data` dataset contains `r nrow(accel_data)` observations of activity count during a 24 hour period for a 63 year old male over 35 days. There are `r ncol(accel_data)` total variables in this dataset, which include the `week` of observation, the `day_id` (day of the week), and the value given to the activity occurring each minute of the day, called `count`. There is also a `day_type` variable, which lists if the activity happened on a weekday or weekend. The resulting dataset has the above-described dimensions: 54000 rows x 6 columns.
+
+## Total Activity Over the Day
+
+```{r, message = FALSE, warning = FALSE}
+total_activity = 
+  accel_data %>% 
+  group_by(day) %>% 
+  summarize(total_activity = sum(count))
+
+total_activity
+```
+
+Wednesdays, Thursdays, and Fridays have the highest activity counts out of all of the days of the week. Saturday has the lowest activity count 
+
+## Plot of 24-Hour Activity Time on Each Day
+
+```{r}
+accel_data %>%  
+  group_by(day, minutes) %>% 
+  ggplot(aes(x = minutes, y = count, color = day)) + 
+  geom_point(alpha = 0.3) + 
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_continuous(breaks = seq(from = 0, to = 1440, by = 60)) +
+   labs(
+    x = "Minute of Day",
+    y = "Activity Count",
+    title = "Scatterplot of 24-Hour Activity Period By Day of Week")
+```
+
+As can be seen in the scatterplot, the majority of activity counts over a 24 hour period during the 35 days of observation fall below 2500. However, there are 4 distinct peaks where activity count is much higher than normal. The first peak occurs around minute 420, which is around the 7th hour of the day. This spike in activity is associated with Thursdays, one of the 63-year-old man's most active days. The next activity peak occurs between minutes 540 and 780, or 9:00AM and 1:00PM. Here we can see a couple of Fridays and Sundays where the activity count went much higher than normal. The third peak is around minute 1020, 5:00PM, which is made up of Saturdays and Sundays. It is interesting Saturday is in this peak because it is the man's lowest activity day on average. The final peak is made up of mostly Fridays and Wednesdays, with the activity happening between 7:00PM and 10:00PM (minutes 1140 to 1320). This is expected because Fridays and Wednesdays are 2 of his 3 highest activity days on average.  
+
+# Problem 3
+
+```{r}
+library(p8105.datasets)
+data("ny_noaa")
+
+ny_noaa = ny_noaa %>% 
+  janitor::clean_names()
 ```
 
 
