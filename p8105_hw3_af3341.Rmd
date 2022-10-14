@@ -9,13 +9,14 @@ editor_options:
 
 ```{r setup, message = FALSE, warning = FALSE}
 library(tidyverse)
-library(ggridges)
 library(dplyr)
+library(patchwork)
+knitr::opts_chunk$set(fig.width = 12, fig.height = 8) 
 ```
 
 # Problem 1
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 library(p8105.datasets)
 data("instacart")
 ```
@@ -74,9 +75,9 @@ grouped = instacart %>%
     coord_flip()
 ```
 
-### Table for three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”
+### Table for most popular items in three aisles
 
-```{r, warning = FALSE}
+```{r, message = FALSE, warning = FALSE}
 three_aisles = instacart %>% 
   group_by(aisle, product_name) %>% 
   summarize(aisle_count = n()) %>% 
@@ -142,7 +143,7 @@ Wednesdays, Thursdays, and Fridays have the highest activity counts out of all o
 
 ## Plot of 24-Hour Activity Time on Each Day
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 accel_data %>%  
   group_by(day, minutes) %>% 
   ggplot(aes(x = minutes, y = count, color = day)) + 
@@ -159,12 +160,98 @@ As can be seen in the scatterplot, the majority of activity counts over a 24 hou
 
 # Problem 3
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 library(p8105.datasets)
 data("ny_noaa")
 
-ny_noaa = ny_noaa %>% 
-  janitor::clean_names()
+ny_noaa_tidy = ny_noaa %>% 
+  janitor::clean_names() %>% 
+  separate(date, into = c("year", "month", "day"),  sep = "-", convert = TRUE) %>% 
+  mutate(
+    year = as.numeric(year), 
+    month = as.numeric(month), 
+    day = as.numeric(day), 
+    prcp = as.numeric(prcp), 
+    snow = as.numeric(snow), 
+    snwd = as.numeric(snwd), 
+    tmax = as.numeric(tmax), 
+    tmin = as.numeric(tmin),
+    prcp = prcp/10,
+    tmax = tmax/10,
+    tmin = tmin/10) 
 ```
 
+## Dataset Description
 
+The `ny_noaa_tidy` dataset contains `r nrow(ny_noaa_tidy)` daily observations of weather data captured at NY weather stations between January of 1981 to December of 2010. There are `r ncol(ny_noaa_tidy)` total variables in this dataset, which include the date of observation, the weather station id `id`, the levels of precipitation (`prcp`) and/or snowfall and snow depth (`snow`/`snwd`) in millimeters. There is also data for the maximum and minimum temperatures on that date of observation, `tmax` and `tmin`.The resulting dataset has the above-described dimensions: 2595176 rows x 9 columns. Because about half of the stations report precipitation only, and there is a lot of variability in record length, one should use caution when making comparisons between stations. We can mitigate this issue by dropping the cells without values so as to only draw comparisons between similar observations. 
+
+## Most Common Snowfall Values
+
+```{r, message = FALSE, warning = FALSE}
+most_snow_values = ny_noaa_tidy %>% 
+  group_by(snow) %>% 
+  distinct() %>% 
+  summarize(
+    n_snow = n()
+    )
+```
+
+The most common snowfall value is 0mm of snow. This makes sense because the majority of days in New York it does not snow. The second most common value is an "NA" because half of the stations do not report on anything other than precipitation (rain). So it makes sense that the second most common snowfall value we see is no value. Of the actual observations of snowfall, 25mm is the most commonly observed amount of snowfall. 
+
+## Average Max Temperature Plot
+
+```{r, message = FALSE, warning = FALSE}
+avg_tmax = 
+  ny_noaa_tidy %>% 
+  group_by(month, year, id) %>% 
+  filter(month == '1' | month == '7') %>% 
+  mutate(month = recode(month, `1` = "January", `7` = "July")) %>% 
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE))
+  
+  avg_tmax %>% 
+    ggplot(aes(x = year, y = mean_tmax, group = id)) + 
+    geom_line(alpha = 0.3) + 
+    facet_grid(. ~ month) + 
+  labs(
+    x = "Year",
+    y = "Mean Max Temperature (C)",
+    title = "Line Plot of Average Max Temperatures in January and July")
+```
+
+It is easy to see that July, between 1981 and 2010, has higher average maximum temperatures than January does between these same years. The plot indicates some outliers. For January, there are a couple stations that observed much warmer or colder temperatures than normal, upwards of 10 degrees celsius in January or as low as -15 degrees celsius. For July, there are also some outlier stations that recorded much warmer or cooler temperatures than normal, like 35 degrees celsius or 15 degrees celsius. 
+
+## Tmax v Tmin and Snowfall for Full Dataset
+
+```{r, message = FALSE, warning = FALSE}
+temps = ny_noaa_tidy %>% 
+  group_by(year, month, day) %>% 
+  drop_na(tmax, tmin)
+
+hex_plot = temps %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_hex() + 
+  labs(
+    x = "Minimum Temp (C)",
+    y = "Maximum Temp (C)",
+    title = "Hexogram plot of all NY weather observations 1981-2010 (tmax vs. tmin)")
+
+snowfall = 
+  ny_noaa_tidy %>% 
+  group_by(snow, year) %>% 
+  filter(between(snow, 0, 100)) %>% 
+  drop_na(snow) %>% 
+  mutate(year = as.character(year))
+
+snowfall_plot = 
+  snowfall %>% 
+  ggplot(aes(x = year, y = snow)) +
+  geom_violin() + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(
+    x = "Year",
+    y = "Snowfall (mm)",
+    title = "Violin plot of NY snowfall observations between 0-100mm")
+
+hex_plot + snowfall_plot
+```
